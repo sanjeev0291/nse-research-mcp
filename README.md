@@ -41,6 +41,15 @@ run `/mcp` and reconnect; the download continues where it left off.
 
 ## Install
 
+### Easiest: let Claude do it
+
+Open Claude Code (terminal, or the Code tab in Claude Desktop) and paste:
+
+> Set up https://github.com/sanjeev0291/nse-research-mcp on this machine. Read its README, install uv if it is missing, install the Claude Code plugin from that repo, run the `--check` warm-up command, add Zerodha's Kite MCP server, and apply the read-only permission rule for the Kite order tools. Then tell me how to start the Stock Desk dashboard.
+
+Claude will run the steps below for you. You need a Zerodha account for the portfolio features; everything
+else works without one.
+
 ### Claude Code, as a plugin (server + `/portfolio-review` skill)
 
 ```bash
