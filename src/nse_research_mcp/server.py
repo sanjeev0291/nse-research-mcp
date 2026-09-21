@@ -556,7 +556,37 @@ def manage_watchlist(action: str = "get", symbols_list: list[str] | None = None)
     return guard(run)
 
 
+def _self_check() -> int:
+    """`nse-research-mcp --check`: warm the environment and verify both data sources. Exit 0 on success."""
+    from . import __version__
+
+    print(f"nse-research-mcp {__version__}: {len(mcp._tool_manager.list_tools())} tools registered")
+    ok = True
+    try:
+        q = yahoo.quote("TCS")
+        print(f"Yahoo Finance: OK  (TCS {q['price']} as of {q['as_of']})")
+    except Exception as e:
+        ok = False
+        print(f"Yahoo Finance: FAILED ({e})")
+    try:
+        st = nse.market_status()
+        cm = next((s for s in st if s.get("market") == "Capital Market"), st[0] if st else {})
+        print(f"NSE India: OK  (Capital Market is {cm.get('marketStatus')})")
+    except Exception as e:
+        ok = False
+        print(f"NSE India: FAILED ({e})")
+    print("READY" if ok else "PROBLEMS FOUND")
+    return 0 if ok else 1
+
+
 def main() -> None:
+    if "--version" in sys.argv:
+        from . import __version__
+
+        print(__version__)
+        return
+    if "--check" in sys.argv:
+        sys.exit(_self_check())
     mcp.run(transport="stdio")
 
 

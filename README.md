@@ -21,7 +21,16 @@ the same conversation. A `/portfolio-review` skill for exactly that is included.
   `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - Claude Code, Claude Desktop, or any MCP client. macOS and Linux tested; Windows should work.
 
-The first start downloads dependencies (about a minute). After that it starts in a second or two.
+The first start on a machine downloads about 100 MB of dependencies (numpy, pandas and friends),
+which can take longer than Claude Code's 30-second server timeout. Warm it up once from a terminal
+before the first session:
+
+```bash
+uvx --from git+https://github.com/sanjeev0291/nse-research-mcp nse-research-mcp --check
+```
+
+That prints the tool count and confirms both data sources respond. After that the server starts in a
+second or two. (If you skip this and the first connection times out, run `/mcp` and reconnect.)
 
 ## Install
 
@@ -152,6 +161,17 @@ Then `/portfolio-review` (full), `/portfolio-review quick` (no research enrichme
 - Watchlist: `~/.config/nse-research/watchlist.json`
 
 Override with the `NSE_RESEARCH_CACHE` and `NSE_RESEARCH_HOME` environment variables.
+
+## Troubleshooting
+
+- `--check` fails on Yahoo: your network blocks `finance.yahoo.com`, or Yahoo is rate limiting; retry.
+- `--check` fails on NSE with HTTP 403/503: NSE's bot protection is throttling you; wait a minute. Some
+  corporate networks and VPNs are blocked outright by NSE.
+- Claude Code says the server timed out on first start: dependencies were still downloading. Run the
+  `--check` command above, then `/mcp` → reconnect.
+- Claude Desktop shows no tools: GUI apps have a minimal PATH. Use the full path to `uvx` in the config.
+- `uv` complains it cannot install Python: install Python 3.11+ yourself (Homebrew, python.org, or
+  your package manager) and uv will use it.
 
 ## Development
 
