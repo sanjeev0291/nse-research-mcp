@@ -18,6 +18,10 @@ dependencies = [
 [project.scripts]
 nse-research-mcp = "nse_research_mcp.server:main"
 
+[tool.uv]
+# compile .pyc at install time so the first server start is not spent byte-compiling pandas & co.
+compile-bytecode = true
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

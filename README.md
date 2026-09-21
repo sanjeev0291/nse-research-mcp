@@ -29,8 +29,15 @@ before the first session:
 uvx --from git+https://github.com/sanjeev0291/nse-research-mcp nse-research-mcp --check
 ```
 
-That prints the tool count and confirms both data sources respond. After that the server starts in a
-second or two. (If you skip this and the first connection times out, run `/mcp` and reconnect.)
+That prints the tool count and confirms both data sources respond. If you installed the Claude Code
+plugin, warm up its own environment instead (the plugin runs from its install folder):
+
+```bash
+uv run --directory "$(ls -d ~/.claude/plugins/cache/nse-research-mcp/nse-research/*/ | tail -1)" nse-research-mcp --check
+```
+
+After that the server starts in a second or two. If you skip this and the first connection times out,
+run `/mcp` and reconnect; the download continues where it left off.
 
 ## Install
 
