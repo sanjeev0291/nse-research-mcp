@@ -1,0 +1,13 @@
+{
+  "name": "nse-research-mcp",
+  "description": "Self-hosted Indian stock research MCP + portfolio review skill",
+  "owner": { "name": "Sanjeev", "email": "sanjeev.0291@gmail.com" },
+  "plugins": [
+    {
+      "name": "nse-research",
+      "description": "Indian stock research (NSE + Yahoo Finance) MCP server and /portfolio-review skill",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "nse-research",
+  "version": "0.1.0",
+  "description": "Indian stock research for Claude: quotes, fundamentals, financials, screener, shareholding, corporate actions, FII/DII, option chain \u2014 straight from NSE and Yahoo Finance, self-hosted, no API keys. Includes a /portfolio-review skill that pairs with Zerodha's Kite MCP.",
+  "author": {
+    "name": "Sanjeev",
+    "email": "sanjeev.0291@gmail.com"
+  },
+  "homepage": "https://github.com/sanjeev0291/nse-research-mcp",
+  "repository": "https://github.com/sanjeev0291/nse-research-mcp",
+  "license": "MIT",
+  "keywords": [
+    "nse",
+    "india",
+    "stocks",
+    "zerodha",
+    "kite",
+    "research",
+    "mcp"
+  ],
+  "mcpServers": {
+    "nse-research": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${CLAUDE_PLUGIN_ROOT}",
+        "nse-research-mcp"
+      ]
+    }
+  }
+}

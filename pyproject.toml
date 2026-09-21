@@ -1,0 +1,26 @@
+[project]
+name = "nse-research-mcp"
+version = "0.1.0"
+description = "Self-hosted MCP server for Indian stock research: NSE + Yahoo Finance data, no third-party API keys, nothing leaves your machine except requests to NSE and Yahoo."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Sanjeev", email = "sanjeev.0291@gmail.com" }]
+dependencies = [
+  "mcp>=1.10,<2",
+  "yfinance>=1.0",
+  "curl_cffi>=0.10",
+  "pandas>=2.0",
+  # cryptography (pulled in by mcp -> pyjwt) stopped shipping Intel-macOS wheels at 49.0; keep a wheel-only version there
+  "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+]
+
+[project.scripts]
+nse-research-mcp = "nse_research_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nse_research_mcp"]
