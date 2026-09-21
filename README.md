@@ -82,6 +82,25 @@ uv sync
 claude mcp add --scope user nse-research -- uv run --directory "$PWD" nse-research-mcp
 ```
 
+## Stock Desk: the web dashboard
+
+The same package ships a local web app that puts everything in one place: your Zerodha portfolio,
+orders and GTT triggers, research pages with charts, a screener, a market view, a watchlist, and an
+"Ask Claude" box that runs Claude Code on your machine with your holdings as context.
+
+```bash
+uvx --from git+https://github.com/sanjeev0291/nse-research-mcp nse-desk
+```
+
+or from a clone: `uv run nse-desk`. It opens http://127.0.0.1:8765 in your browser. Click **Connect**
+(top right) to log in to Zerodha through Kite's own login page; the session is remembered until Kite
+expires it. Orders and GTTs are sent through Zerodha's official Kite MCP server and every action asks
+for confirmation first. Ask Claude needs the Claude Code CLI installed; it never gets your Kite session,
+only a snapshot of your holdings.
+
+The desk listens on localhost only. Nothing is stored except the Kite session id, the watchlist and
+NSE's daily CSVs, all under `~/.config/nse-research` and `~/.cache/nse-research`.
+
 ## Pair with your Zerodha account (optional)
 
 Zerodha hosts an official MCP server for Kite. Nothing to install:

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock Desk</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Stock Desk <span class="muted">NSE · Zerodha</span></div>
+  <div class="market" id="marketStrip"></div>
+  <div class="conn" id="conn">
+    <span class="pill off" id="connPill">Zerodha: checking…</span>
+    <button id="connBtn" class="btn">Connect</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="portfolio" class="active">Portfolio</button>
+  <button data-tab="orders">Orders</button>
+  <button data-tab="research">Research</button>
+  <button data-tab="screener">Screener</button>
+  <button data-tab="market">Market</button>
+  <button data-tab="watchlist">Watchlist</button>
+  <button data-tab="ai">Ask Claude</button>
+</nav>
+
+<main>
+<!-- ---------------- Portfolio ---------------- -->
+<section id="tab-portfolio" class="tab active">
+  <div class="toolbar">
+    <button class="btn" id="pfRefresh">Refresh</button>
+    <button class="btn" id="pfEnrich">Enrich with research</button>
+    <span class="muted" id="pfMeta"></span>
+  </div>
+  <div class="cards" id="pfCards"></div>
+  <div class="grid2">
+    <div class="panel">
+      <h3>Holdings</h3>
+      <div class="scroll"><table id="pfTable"></table></div>
+    </div>
+    <div class="panel">
+      <h3>By industry</h3>
+      <div id="pfSectors"></div>
+      <h3>Positions</h3>
+      <div class="scroll"><table id="posTable"></table></div>
+      <h3>Margins</h3>
+      <div id="margins" class="kv"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ---------------- Orders ---------------- -->
+<section id="tab-orders" class="tab">
+  <div class="toolbar"><button class="btn" id="ordRefresh">Refresh</button><span class="muted">Orders and GTTs go to Zerodha through the official Kite MCP. Every action asks for confirmation.</span></div>
+  <div class="grid2">
+    <div class="panel">
+      <h3>Place order</h3>
+      <form id="orderForm" class="form">
+        <label>Symbol <input name="tradingsymbol" required placeholder="TCS" autocomplete="off"></label>
+        <label>Exchange <select name="exchange"><option>NSE</option><option>BSE</option><option>NFO</option><option>BFO</option><option>MCX</option></select></label>
+        <label>Side <select name="transaction_type"><option>BUY</option><option>SELL</option></select></label>
+        <label>Qty <input name="quantity" type="number" min="1" step="1" required></label>
+        <label>Type <select name="order_type" id="orderType"><option>MARKET</option><option>LIMIT</option><option>SL</option><option>SL-M</option></select></label>
+        <label>Product <select name="product"><option>CNC</option><option>MIS</option><option>NRML</option><option>MTF</option></select></label>
+        <label>Price <input name="price" type="number" step="0.05" placeholder="for LIMIT / SL"></label>
+        <label>Trigger <input name="trigger_price" type="number" step="0.05" placeholder="for SL / SL-M"></label>
+        <label>Validity <select name="validity"><option>DAY</option><option>IOC</option></select></label>
+        <label>Variety <select name="variety"><option>regular</option><option>amo</option></select></label>
+        <div class="row"><button class="btn primary" type="submit">Place order</button></div>
+      </form>
+      <h3>Place GTT (single trigger)</h3>
+      <form id="gttForm" class="form">
+        <label>Symbol <input name="tradingsymbol" required placeholder="TCS"></label>
+        <label>Exchange <select name="exchange"><option>NSE</option><option>BSE</option></select></label>
+        <label>Side <select name="transaction_type"><option>SELL</option><option>BUY</option></select></label>
+        <label>Qty <input name="quantity" type="number" min="1" step="1" required></label>
+        <label>Trigger at <input name="trigger_value" type="number" step="0.05" required></label>
+        <label>Limit price <input name="limit_price" type="number" step="0.05" required></label>
+        <label>Product <select name="product"><option>CNC</option><option>MIS</option><option>NRML</option></select></label>
+        <div class="row"><button class="btn primary" type="submit">Place GTT</button></div>
+      </form>
+      <pre id="orderResult" class="result" hidden></pre>
+    </div>
+    <div class="panel">
+      <h3>Today's orders</h3>
+      <div class="scroll"><table id="ordTable"></table></div>
+      <h3>GTT triggers</h3>
+      <div class="scroll"><table id="gttTable"></table></div>
+      <h3>Trades today</h3>
+      <div class="scroll"><table id="tradeTable"></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ---------------- Research ---------------- -->
+<section id="tab-research" class="tab">
+  <div class="toolbar">
+    <input id="rsQuery" placeholder="Search a stock: tcs, tata motors, INFY…" autocomplete="off">
+    <div id="rsSuggest" class="suggest" hidden></div>
+    <button class="btn" id="rsWatch">+ Watchlist</button>
+    <button class="btn" id="rsTrade">Trade</button>
+  </div>
+  <div id="rsEmpty" class="muted">Search for a stock, or click one in your portfolio.</div>
+  <div id="rsView" hidden>
+    <div class="stockhead">
+      <div><h2 id="rsName"></h2><div class="muted" id="rsSub"></div></div>
+      <div class="price"><span id="rsPrice"></span> <span id="rsChange"></span></div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="chartbar"><span>1 year, daily close</span><span id="rsChartMeta" class="muted"></span></div>
+        <svg id="rsChart" viewBox="0 0 640 260" preserveAspectRatio="none"></svg>
+        <div class="kv" id="rsStats"></div>
+      </div>
+      <div class="panel">
+        <h3>Ratios</h3>
+        <div id="rsRatios" class="kvgrid"></div>
+        <h3>Analysts</h3>
+        <div id="rsAnalyst" class="kv"></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <h3>Financials <span class="seg"><button data-period="annual" class="active">Annual</button><button data-period="quarterly">Quarterly</button></span></h3>
+        <div class="scroll" id="rsFin"></div>
+      </div>
+      <div class="panel">
+        <h3>Shareholding</h3><div class="scroll"><table id="rsShp"></table></div>
+        <h3>Corporate actions</h3><div id="rsActions" class="list"></div>
+      </div>
+    </div>
+    <div class="panel"><h3>Latest announcements</h3><div id="rsAnn" class="list"></div></div>
+  </div>
+</section>
+
+<!-- ---------------- Screener ---------------- -->
+<section id="tab-screener" class="tab">
+  <form id="scForm" class="form wide">
+    <label>Min mcap (₹ cr) <input name="min_market_cap_cr" type="number" placeholder="5000"></label>
+    <label>Max mcap (₹ cr) <input name="max_market_cap_cr" type="number"></label>
+    <label>Min PE <input name="min_pe" type="number" step="0.1"></label>
+    <label>Max PE <input name="max_pe" type="number" step="0.1" placeholder="20"></label>
+    <label>Max PB <input name="max_pb" type="number" step="0.1"></label>
+    <label>Min ROE % <input name="min_roe_pct" type="number" step="0.1" placeholder="15"></label>
+    <label>Min div yield % <input name="min_dividend_yield_pct" type="number" step="0.1"></label>
+    <label>Min rev growth % <input name="min_revenue_growth_pct" type="number" step="0.1"></label>
+    <label>Min EPS growth % <input name="min_eps_growth_pct" type="number" step="0.1"></label>
+    <label>Min 52w chg % <input name="min_52w_change_pct" type="number" step="0.1"></label>
+    <label>Max 52w chg % <input name="max_52w_change_pct" type="number" step="0.1"></label>
+    <label>Sector <select name="sector"><option value="">Any</option><option>Basic Materials</option><option>Communication Services</option><option>Consumer Cyclical</option><option>Consumer Defensive</option><option>Energy</option><option>Financial Services</option><option>Healthcare</option><option>Industrials</option><option>Real Estate</option><option>Technology</option><option>Utilities</option></select></label>
+    <label>Sort <select name="sort_by"><option value="market_cap">Market cap</option><option value="pe">PE</option><option value="dividend_yield">Dividend yield</option><option value="change_1d">1-day change</option><option value="change_52w">52-week change</option><option value="volume">Volume</option></select></label>
+    <label>Order <select name="ascending"><option value="false">Desc</option><option value="true">Asc</option></select></label>
+    <label>Limit <input name="limit" type="number" value="40" min="1" max="250"></label>
+    <div class="row"><button class="btn primary" type="submit">Run screen</button><span class="muted" id="scMeta"></span></div>
+  </form>
+  <div class="panel"><div class="scroll"><table id="scTable"></table></div></div>
+</section>
+
+<!-- ---------------- Market ---------------- -->
+<section id="tab-market" class="tab">
+  <div class="toolbar"><button class="btn" id="mkRefresh">Refresh</button><span class="muted" id="mkMeta"></span></div>
+  <div class="cards" id="mkIndices"></div>
+  <div class="grid3">
+    <div class="panel"><h3>Sector leaders / laggards</h3><div id="mkSectors" class="kv"></div><h3>FII / DII (₹ cr)</h3><div id="mkFlows" class="kv"></div></div>
+    <div class="panel"><h3>NIFTY gainers</h3><table id="mkGainers"></table><h3>NIFTY losers</h3><table id="mkLosers"></table></div>
+    <div class="panel"><h3>Most active (value)</h3><table id="mkActive"></table><h3>NIFTY options (nearest expiry)</h3><div id="mkChain" class="kv"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel"><h3>New 52-week highs</h3><table id="mkHighs"></table></div>
+    <div class="panel"><h3>New 52-week lows</h3><table id="mkLows"></table></div>
+  </div>
+  <div class="panel"><h3>Bulk & block deals</h3><div class="scroll"><table id="mkDeals"></table></div></div>
+</section>
+
+<!-- ---------------- Watchlist ---------------- -->
+<section id="tab-watchlist" class="tab">
+  <div class="toolbar"><input id="wlAdd" placeholder="Add symbol, e.g. HDFCBANK"><button class="btn" id="wlAddBtn">Add</button><button class="btn" id="wlRefresh">Refresh</button></div>
+  <div class="panel"><div class="scroll"><table id="wlTable"></table></div></div>
+</section>
+
+<!-- ---------------- Ask Claude ---------------- -->
+<section id="tab-ai" class="tab">
+  <div class="panel">
+    <div class="muted" id="aiNote">Runs Claude Code on this machine with the nse-research tools. Your holdings are attached when the box below is ticked.</div>
+    <div class="presets" id="aiPresets">
+      <button>Review my portfolio: concentration, sector tilt, weak spots</button>
+      <button>Which of my holdings look expensive versus peers right now?</button>
+      <button>What moved the market today and does it affect my stocks?</button>
+      <button>Find 5 large caps with PE under 15 and ROE over 15%, and explain each in a line</button>
+    </div>
+    <textarea id="aiQ" rows="4" placeholder="Ask anything about your stocks or the market…"></textarea>
+    <div class="row"><label class="check"><input type="checkbox" id="aiPf" checked> include my holdings</label><button class="btn primary" id="aiAsk">Ask</button><span class="muted" id="aiMeta"></span></div>
+    <div id="aiAnswer" class="md"></div>
+  </div>
+</section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
