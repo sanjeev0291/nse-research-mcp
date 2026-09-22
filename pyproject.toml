@@ -21,6 +21,7 @@ dependencies = [
 [project.scripts]
 nse-research-mcp = "nse_research_mcp.server:main"
 nse-desk = "nse_research_mcp.desk.app:main"
+nse-alerts = "nse_research_mcp.alerts:main"
 
 [tool.uv]
 # compile .pyc at install time so the first server start is not spent byte-compiling pandas & co.

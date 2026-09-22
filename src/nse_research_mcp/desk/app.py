@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from contextlib import asynccontextmanager
 import os
+import time
 import shutil
 import subprocess
 import sys
@@ -25,6 +27,8 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from .. import nse, server as S, symbols, yahoo
+from ..alerts import AlertEngine
+from ..portfolio import holdings_summary
 from ..kite_client import READ_TOOLS, WRITE_TOOLS, KiteClient, KiteError, KiteUnreachable, NotLoggedIn
 
 STATIC = Path(__file__).parent / "static"
@@ -104,53 +108,11 @@ async def kite_call(request: Request):
         return await run_in_threadpool(_kite_error, e)
 
 
-def _num(v, default=0.0):
-    try:
-        return float(v)
-    except Exception:
-        return default
-
-
 def _holdings():
-    raw = kite.call("get_holdings")
-    rows = KiteClient.rows(raw)
-    members = symbols.membership()
-    out, invested, current, day_pnl = [], 0.0, 0.0, 0.0
-    for h in rows:
-        sym = h.get("tradingsymbol") or h.get("symbol") or ""
-        qty = _num(h.get("quantity")) + _num(h.get("t1_quantity"))
-        avg, ltp = _num(h.get("average_price")), _num(h.get("last_price"))
-        close = _num(h.get("close_price")) or ltp
-        value, cost = qty * ltp, qty * avg
-        m = members.get(sym, {})
-        out.append(
-            {
-                "symbol": sym, "exchange": h.get("exchange"), "isin": h.get("isin"), "product": h.get("product"),
-                "quantity": qty, "t1_quantity": _num(h.get("t1_quantity")), "average_price": avg, "last_price": ltp,
-                "invested": round(cost, 2), "value": round(value, 2), "pnl": round(value - cost, 2),
-                "pnl_pct": round((ltp / avg - 1) * 100, 2) if avg else None,
-                "day_change_pct": _num(h.get("day_change_percentage")) or (round((ltp / close - 1) * 100, 2) if close else None),
-                "day_pnl": round((ltp - close) * qty, 2) if close else None,
-                "industry": m.get("industry"), "cap_bucket": m.get("cap_bucket"), "indices": m.get("indices", []),
-            }
-        )
-        invested += cost
-        current += value
-        day_pnl += (ltp - close) * qty if close else 0.0
-    for r in out:
-        r["weight_pct"] = round(r["value"] / current * 100, 2) if current else None
-    out.sort(key=lambda r: -r["value"])
-    sectors: dict[str, float] = {}
-    for r in out:
-        k = r["industry"] or "Unclassified"
-        sectors[k] = sectors.get(k, 0.0) + r["value"]
-    sector_rows = sorted(({"industry": k, "value": round(v, 2), "weight_pct": round(v / current * 100, 2) if current else None} for k, v in sectors.items()), key=lambda x: -x["value"])
-    totals = {
-        "count": len(out), "invested": round(invested, 2), "current": round(current, 2), "pnl": round(current - invested, 2),
-        "pnl_pct": round((current / invested - 1) * 100, 2) if invested else None, "day_pnl": round(day_pnl, 2),
-        "top3_weight_pct": round(sum(r["weight_pct"] or 0 for r in out[:3]), 2) if out else None,
-    }
-    return {"holdings": out, "totals": totals, "sectors": sector_rows}
+    return holdings_summary(kite)
+
+
+engine = AlertEngine(holdings_fn=lambda: _holdings()["holdings"])
 
 
 async def kite_holdings(request: Request):
@@ -318,6 +280,53 @@ async def ai_status(request: Request):
     return ok({"available": _claude_bin() is not None})
 
 
+# ------------------------------------------------------------------ alerts ----------------------
+
+async def alerts_get(request: Request):
+    return ok(engine.snapshot())
+
+
+async def alerts_add(request: Request):
+    b = await request.json()
+    try:
+        return ok(engine.add_rule(b.get("symbol", ""), b.get("kind", ""), b.get("value"), b.get("direction", "either"), b.get("repeat", True), b.get("note", "")))
+    except ValueError as e:
+        return fail(e)
+
+
+async def alerts_rule(request: Request):
+    b = await request.json()
+    try:
+        r = engine.rule_action(request.path_params["rule_id"], b.get("action", ""))
+    except ValueError as e:
+        return fail(e)
+    return ok(r) if r else fail("no such rule", 404)
+
+
+async def alerts_settings(request: Request):
+    b = await request.json()
+    try:
+        return ok(engine.update_settings(b))
+    except (TypeError, ValueError) as e:
+        return fail(e)
+
+
+async def alerts_test(request: Request):
+    return ok(await run_in_threadpool(engine.test_notification))
+
+
+async def alerts_check(request: Request):
+    return ok(await run_in_threadpool(engine.check, True))
+
+
+async def alerts_events(request: Request):
+    try:
+        since = float(request.query_params.get("since", "0"))
+    except ValueError:
+        since = 0.0
+    return ok({"events": engine.events_since(since), "now": time.time()})
+
+
 routes = [
     Route("/", index),
     Route("/api/kite/status", kite_status),
@@ -337,10 +346,26 @@ routes = [
     Route("/api/watchlist", watchlist_post, methods=["POST"]),
     Route("/api/ai/ask", ai_ask, methods=["POST"]),
     Route("/api/ai/status", ai_status),
+    Route("/api/alerts", alerts_get),
+    Route("/api/alerts/rules", alerts_add, methods=["POST"]),
+    Route("/api/alerts/rules/{rule_id}", alerts_rule, methods=["POST"]),
+    Route("/api/alerts/settings", alerts_settings, methods=["POST"]),
+    Route("/api/alerts/test", alerts_test, methods=["POST"]),
+    Route("/api/alerts/check", alerts_check, methods=["POST"]),
+    Route("/api/alerts/events", alerts_events),
     Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
 ]
 
-app = Starlette(routes=routes)
+@asynccontextmanager
+async def lifespan(_app):
+    engine.start()
+    try:
+        yield
+    finally:
+        engine.stop()
+
+
+app = Starlette(routes=routes, lifespan=lifespan)
 
 
 def main() -> None:

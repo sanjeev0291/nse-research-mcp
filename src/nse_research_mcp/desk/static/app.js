@@ -67,7 +67,7 @@ function showTab(name) {
   $$('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + name));
   if (!state.loaded[name]) {
     state.loaded[name] = true;
-    const loader = { portfolio: loadPortfolio, orders: loadOrders, market: loadMarket, watchlist: loadWatchlist, ai: loadAiStatus }[name];
+    const loader = { portfolio: loadPortfolio, orders: loadOrders, market: loadMarket, watchlist: loadWatchlist, alerts: loadAlerts, ai: loadAiStatus }[name];
     if (loader) loader();
   }
 }
@@ -417,8 +417,69 @@ function md(src) {
   return out;
 }
 
+// ---------- Alerts ----------
+let alertsSince = Date.now() / 1000, unread = 0;
+const DIR_LABEL = { either: 'up or down', up: 'up only', down: 'down only' };
+function ruleText(r, kinds) {
+  const k = (kinds && kinds[r.kind]) || r.kind;
+  const x = r.kind === 'above' || r.kind === 'below' ? fmt.inr(r.value) : r.value + '%';
+  return k.replace('X%', x).replace('X', x) + (r.kind === 'move' || r.kind.startsWith('portfolio') ? ` (${DIR_LABEL[r.direction] || ''})` : '');
+}
+function updateBell() { const b = $('#bellCount'); b.hidden = unread === 0; b.textContent = unread; }
+async function loadAlerts() {
+  const d = await api.get('/api/alerts'); state.alerts = d;
+  const st = d.status || {};
+  $('#alStatus').textContent = st.waiting ? `Paused: ${st.waiting}` : st.last_check_ist ? `Last check ${st.last_check_ist} IST · ${(st.last_summary || {}).quotes || 0} quotes` : (st.running ? 'Running, no check yet' : 'Not running');
+  table($('#alRules'), [
+    { k: 'symbol', label: 'Symbol', fmt: (v) => `<b>${esc(v)}</b>` },
+    { k: 'kind', label: 'Rule', fmt: (v, r) => esc(ruleText(r, d.kinds)) + (r.note ? ` <span class="muted">${esc(r.note)}</span>` : '') },
+    { k: 'repeat', label: 'Repeat', fmt: (v) => v ? 'yes' : 'once' },
+    { k: 'state', label: 'Last price', fmt: (v) => fmt.num(v && v.last_price) },
+    { k: 'state', label: 'Last fired', fmt: (v) => { const t = Math.max(0, ...Object.values((v && v.last_fired) || {})); return t ? new Date(t * 1000).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '–'; } },
+    { k: 'enabled', label: 'Status', fmt: (v) => `<button class="btn small" data-act="toggle">${v ? 'on' : 'off'}</button>`, cls: (v) => v ? 'up' : 'muted' },
+    { k: 'id', label: '', fmt: () => `<button class="btn small danger" data-act="delete">Delete</button>` },
+  ], d.rules, { empty: 'No alerts yet. Add one above.', onButton: async (act, row) => { await api.post(`/api/alerts/rules/${row.id}`, { action: act }); loadAlerts(); } });
+  renderEvents(d.events);
+  const s = d.settings || {}; const f = $('#alSettings');
+  f.interval_sec.value = s.interval_sec ?? 60; f.cooldown_min.value = s.cooldown_min ?? 30; f.only_market_hours.checked = !!s.only_market_hours; f.desktop.checked = !!s.desktop;
+  f.telegram_token.placeholder = s.telegram_token_set ? `set (${s.telegram_token_hint}); blank = keep` : 'not set'; f.telegram_chat_id.value = s.telegram_chat_id || '';
+  unread = 0; updateBell();
+}
+function renderEvents(evs) {
+  $('#alEvents').innerHTML = (evs && evs.length) ? evs.slice(0, 30).map(e => `<div class="item"><b>${esc(e.message)}</b><div class="d">${esc(e.time_ist)}${e.note ? ' · ' + esc(e.note) : ''}${e.delivered ? ` · ${e.delivered.desktop ? 'desktop ✓' : ''} ${e.delivered.telegram ? 'telegram ✓' : ''}` : ''}</div></div>`).join('') : '<span class="muted">Nothing has fired yet.</span>';
+}
+$('#alKind').onchange = () => { $('#alSymbolWrap').style.display = $('#alKind').value.startsWith('portfolio') ? 'none' : ''; };
+$('#alForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target).entries());
+  const r = await api.post('/api/alerts/rules', { symbol: f.symbol, kind: f.kind, value: +f.value, direction: f.direction, repeat: f.repeat === 'true', note: f.note });
+  if (r.error) { toast(r.error); return; }
+  toast(`Alert added: ${ruleText(r, state.alerts && state.alerts.kinds)}`); e.target.reset(); $('#alKind').onchange(); loadAlerts();
+};
+$('#alCheck').onclick = async () => { $('#alCheck').disabled = true; const r = await api.post('/api/alerts/check'); $('#alCheck').disabled = false; toast(`Checked ${r.rules} rules, ${r.quotes} quotes, ${r.events.length} fired${r.note ? ' · ' + r.note : ''}`); loadAlerts(); };
+$('#alSettings').onsubmit = async (e) => {
+  e.preventDefault(); const f = e.target;
+  const r = await api.post('/api/alerts/settings', { interval_sec: +f.interval_sec.value, cooldown_min: +f.cooldown_min.value, only_market_hours: f.only_market_hours.checked, desktop: f.desktop.checked, telegram_token: f.telegram_token.value.trim(), telegram_chat_id: f.telegram_chat_id.value.trim() });
+  $('#alSettingsMeta').textContent = r.error ? r.error : 'Saved'; f.telegram_token.value = ''; loadAlerts();
+};
+$('#alTest').onclick = async () => { const r = await api.post('/api/alerts/test'); toast(`Test sent: desktop ${r.desktop ? '✓' : '✗'}, telegram ${r.telegram ? '✓' : (state.alerts && state.alerts.settings.telegram_token_set ? '✗' : 'not set')}`, 6000); };
+$('#alBrowser').onclick = async () => { if (!('Notification' in window)) { toast('This browser has no notification support'); return; } const p = await Notification.requestPermission(); toast('Browser notifications: ' + p); };
+async function pollAlerts() {
+  try {
+    const r = await api.get('/api/alerts/events?since=' + alertsSince);
+    alertsSince = r.now || alertsSince;
+    for (const e of r.events || []) {
+      toast(e.message, 8000);
+      if ('Notification' in window && Notification.permission === 'granted') new Notification('Stock Desk: ' + e.symbol, { body: e.message });
+    }
+    if ((r.events || []).length) { unread += r.events.length; updateBell(); if ($('#tab-alerts').classList.contains('active')) loadAlerts(); }
+  } catch (err) { /* server may be restarting */ }
+}
+setInterval(pollAlerts, 30000);
+$('#bell').onclick = () => showTab('alerts');
+
 // ---------- deep links (#market, #research/TCS) ----------
-const TABS = ['portfolio', 'orders', 'research', 'screener', 'market', 'watchlist', 'ai'];
+const TABS = ['portfolio', 'orders', 'research', 'screener', 'market', 'watchlist', 'alerts', 'ai'];
 function applyHash() {
   const [tab, arg] = location.hash.replace(/^#/, '').split('/');
   if (tab === 'research' && arg) { openStock(decodeURIComponent(arg)); return; }

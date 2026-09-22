@@ -107,6 +107,15 @@ expires it. Orders and GTTs are sent through Zerodha's official Kite MCP server 
 for confirmation first. Ask Claude needs the Claude Code CLI installed; it never gets your Kite session,
 only a snapshot of your holdings.
 
+**Alerts.** The Alerts tab lets you set rules such as "TCS moves more than 3% today", "INFY goes below
+₹1,000", "any holding moves more than 2% today" or "any holding is down 10% from my buy price". While
+the desk is running, rules are checked every minute during NSE hours (configurable). A triggered rule
+shows in the dashboard (bell icon and browser notification), pops a macOS or Linux desktop
+notification, and can be sent to your phone through a Telegram bot you own (instructions in the tab).
+Rules and history live in `~/.config/nse-research/alerts.json`. Without the browser open, run
+`nse-alerts run` in a terminal for the same checks, or `nse-alerts add TCS move 3 --direction down`,
+`nse-alerts list`, `nse-alerts check`, `nse-alerts test`.
+
 The desk listens on localhost only. Nothing is stored except the Kite session id, the watchlist and
 NSE's daily CSVs, all under `~/.config/nse-research` and `~/.cache/nse-research`.
 

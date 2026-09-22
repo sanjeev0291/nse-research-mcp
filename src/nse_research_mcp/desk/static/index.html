@@ -11,6 +11,7 @@
   <div class="brand">Stock Desk <span class="muted">NSE · Zerodha</span></div>
   <div class="market" id="marketStrip"></div>
   <div class="conn" id="conn">
+    <button id="bell" class="btn" title="Alerts">&#128276;<span id="bellCount" class="badge" hidden></span></button>
     <span class="pill off" id="connPill">Zerodha: checking…</span>
     <button id="connBtn" class="btn">Connect</button>
   </div>
@@ -23,6 +24,7 @@
   <button data-tab="screener">Screener</button>
   <button data-tab="market">Market</button>
   <button data-tab="watchlist">Watchlist</button>
+  <button data-tab="alerts">Alerts</button>
   <button data-tab="ai">Ask Claude</button>
 </nav>
 
@@ -178,6 +180,47 @@
 <section id="tab-watchlist" class="tab">
   <div class="toolbar"><input id="wlAdd" placeholder="Add symbol, e.g. HDFCBANK"><button class="btn" id="wlAddBtn">Add</button><button class="btn" id="wlRefresh">Refresh</button></div>
   <div class="panel"><div class="scroll"><table id="wlTable"></table></div></div>
+</section>
+
+<!-- ---------------- Alerts ---------------- -->
+<section id="tab-alerts" class="tab">
+  <div class="grid2">
+    <div class="panel">
+      <h3>New alert</h3>
+      <form id="alForm" class="form">
+        <label>Rule <select name="kind" id="alKind">
+          <option value="move">Stock moves more than X% today</option>
+          <option value="above">Stock price goes above ₹X</option>
+          <option value="below">Stock price goes below ₹X</option>
+          <option value="portfolio_move">Any holding moves more than X% today</option>
+          <option value="portfolio_pnl">Any holding's P&amp;L vs buy price crosses X%</option>
+        </select></label>
+        <label id="alSymbolWrap">Symbol <input name="symbol" placeholder="TCS" autocomplete="off"></label>
+        <label>X <input name="value" type="number" step="0.05" min="0" required placeholder="3"></label>
+        <label>Direction <select name="direction"><option value="either">Up or down</option><option value="up">Up only</option><option value="down">Down only</option></select></label>
+        <label>Repeat <select name="repeat"><option value="true">Keep alerting (after cooldown)</option><option value="false">Once, then switch off</option></select></label>
+        <label>Note <input name="note" placeholder="optional"></label>
+        <div class="row"><button class="btn primary" type="submit">Add alert</button><button class="btn" type="button" id="alCheck">Check now</button><span class="muted" id="alStatus"></span></div>
+      </form>
+      <h3>Rules</h3>
+      <div class="scroll"><table id="alRules"></table></div>
+    </div>
+    <div class="panel">
+      <h3>Recent alerts</h3>
+      <div id="alEvents" class="list"></div>
+      <h3>Delivery</h3>
+      <form id="alSettings" class="form">
+        <label>Check every (sec) <input name="interval_sec" type="number" min="15"></label>
+        <label>Cooldown (min) <input name="cooldown_min" type="number" min="0"></label>
+        <label class="check"><input type="checkbox" name="only_market_hours"> only during market hours</label>
+        <label class="check"><input type="checkbox" name="desktop"> desktop notifications</label>
+        <label>Telegram bot token <input name="telegram_token" placeholder="blank = keep current" autocomplete="off"></label>
+        <label>Telegram chat id <input name="telegram_chat_id" autocomplete="off"></label>
+        <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="alTest">Send test</button><button class="btn" type="button" id="alBrowser">Enable browser notifications</button><span class="muted" id="alSettingsMeta"></span></div>
+      </form>
+      <div class="muted">Phone notifications via Telegram: message <b>@BotFather</b>, send <code>/newbot</code>, paste the token above. Then send any message to your new bot and open <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> in a browser; the <code>chat.id</code> in that page is your chat id. Alerts are checked only while Stock Desk (or <code>nse-alerts run</code>) is running.</div>
+    </div>
+  </div>
 </section>
 
 <!-- ---------------- Ask Claude ---------------- -->
