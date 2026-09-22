@@ -22,7 +22,7 @@ import uvicorn
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse
+from starlette.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
@@ -44,8 +44,25 @@ def fail(msg, status=400, **extra):
     return JSONResponse({"error": str(msg), **extra}, status_code=status)
 
 
+def _asset_version() -> str:
+    """Changes whenever a static file changes, so browsers never reuse a stale script after an update."""
+    return str(int(max(p.stat().st_mtime for p in STATIC.iterdir() if p.is_file())))
+
+
 async def index(request: Request):
-    return FileResponse(STATIC / "index.html")
+    html = (STATIC / "index.html").read_text()
+    v = _asset_version()
+    html = html.replace('/static/style.css"', f'/static/style.css?v={v}"').replace('/static/app.js"', f'/static/app.js?v={v}"')
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+
+
+class NoCacheStatic(StaticFiles):
+    """Static files that browsers always revalidate (a 304 is cheap; a stale app.js breaks the UI)."""
+
+    async def get_response(self, path, scope):
+        resp = await super().get_response(path, scope)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
 
 
 # ------------------------------------------------------------------ Zerodha (Kite MCP) ----------
@@ -353,7 +370,7 @@ routes = [
     Route("/api/alerts/test", alerts_test, methods=["POST"]),
     Route("/api/alerts/check", alerts_check, methods=["POST"]),
     Route("/api/alerts/events", alerts_events),
-    Mount("/static", StaticFiles(directory=str(STATIC)), name="static"),
+    Mount("/static", NoCacheStatic(directory=str(STATIC)), name="static"),
 ]
 
 @asynccontextmanager
